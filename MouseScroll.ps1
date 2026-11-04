@@ -136,6 +136,16 @@ if ($Mode -ne 'Interface') {
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+
+public static class MouseScrollShell
+{
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    public static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+}
+'@
+[void][MouseScrollShell]::SetCurrentProcessExplicitAppUserModelID('LeoSalema.MouseScroll')
 [Windows.Forms.Application]::EnableVisualStyles()
 
 $surface = [Drawing.Color]::FromArgb(241, 245, 252)
@@ -157,7 +167,10 @@ $form = [Windows.Forms.Form]@{
 $icon = [Drawing.Icon]::new((Join-Path $PSScriptRoot 'MouseScroll.ico'))
 $form.Icon = $icon
 $header = [Windows.Forms.Panel]@{ Left = 0; Top = 0; Width = 820; Height = 108; BackColor = $ink; ForeColor = $white }
-$mark = [Windows.Forms.PictureBox]@{ Left = 24; Top = 22; Width = 64; Height = 64; SizeMode = 'Zoom'; Image = $icon.ToBitmap() }
+$mark = [Windows.Forms.PictureBox]@{
+    Left = 24; Top = 22; Width = 64; Height = 64; SizeMode = 'Zoom'
+    Image = [Drawing.Bitmap]::new((Join-Path $PSScriptRoot 'MouseScroll.png'))
+}
 $title = [Windows.Forms.Label]@{
     Text = 'Mouse Scroll'; Left = 104; Top = 18; Width = 660; Height = 43
     Font = [Drawing.Font]::new('Segoe UI', 23, [Drawing.FontStyle]::Bold)
