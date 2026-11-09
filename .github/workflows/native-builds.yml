@@ -1,0 +1,55 @@
+name: Native Windows and macOS
+on:
+  push:
+    branches: [main, 'codex/**']
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build universal app and DMG; run native self-tests
+        run: bash macos/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MouseScroll-macOS
+          path: |
+            release/1.1.0-preview.4/macOS/MouseScroll-macOS.dmg
+            release/1.1.0-preview.4/macOS/MouseScroll-macOS.dmg.sha256
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install NSIS compiler
+        run: choco install nsis --no-progress -y
+      - name: Native tests
+        shell: powershell
+        run: .\Test.ps1
+      - name: Build native installer (UTF-8)
+        shell: powershell
+        run: .\Build.ps1 -Installer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MouseScroll-Windows
+          path: |
+            release/1.1.0-preview.4/MouseScroll-Instalar.exe
+            release/1.1.0-preview.4/MouseScroll-Instalar.exe.sha256
+  publish:
+    needs: [windows, macos]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+      - name: Publish both installers as preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v1.1.0-preview.4 || gh release create v1.1.0-preview.4 --prerelease --title 'Mouse Scroll 1.1.0-preview.4' --notes-file docs/RELEASE-preview.4.md
+          gh release upload v1.1.0-preview.4 packages/* --clobber

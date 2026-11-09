@@ -8,15 +8,17 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Mouse Scroll")]
 [assembly: AssemblyDescription("Ajusta a direção da rolagem dos mouses no Windows")]
 [assembly: AssemblyProduct("Mouse Scroll")]
-[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.4")]
+[assembly: AssemblyInformationalVersion(MouseScrollInfo.Version)]
 
 internal static class MouseScrollLauncher
 {
     private static readonly string[] Resources =
-        { "MouseScroll.ps1", "MouseScroll.ico", "MouseScroll.png" };
+        { "MouseScroll.ps1", "MouseScroll.ico", "MouseScroll.png", "MouseScroll.Native.cs",
+          "sun-dark.png", "sun-light.png", "moon-dark.png", "moon-light.png", "settings-dark.png", "settings-light.png" };
 
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
         string sessionDirectory = Path.Combine(Path.GetTempPath(), "MouseScroll-" + Guid.NewGuid().ToString("N"));
         try
@@ -37,9 +39,19 @@ internal static class MouseScrollLauncher
             {
                 runspace.Open();
                 engine.Runspace = runspace;
-                engine.AddCommand(Path.Combine(sessionDirectory, "MouseScroll.ps1")).Invoke();
-                if (engine.HadErrors)
-                    throw new InvalidOperationException(engine.Streams.Error[0].ToString());
+                engine.AddCommand(Path.Combine(sessionDirectory, "MouseScroll.ps1"));
+                // An isolated profile lets QA check themes without changing personal preferences.
+                if (args.Length == 2 && args[0] == "--profile") engine.AddParameter("ProfileDirectory", Path.GetFullPath(args[1]));
+                if (args.Length == 2 && args[0] == "--capture") {
+                    string directory = Path.GetFullPath(args[1]);
+                    engine.AddParameter("ProfileDirectory", Path.Combine(directory, "profile"));
+                    engine.AddParameter("CaptureDirectory", directory);
+                }
+                engine.Invoke();
+                // The script stops on real failures. Registry probes intentionally use
+                // SilentlyContinue for missing optional properties; those are not startup errors.
+                if (engine.InvocationStateInfo.State == PSInvocationState.Failed)
+                    throw new InvalidOperationException("Não foi possível iniciar o Mouse Scroll.", engine.InvocationStateInfo.Reason);
             }
             return 0;
         }
