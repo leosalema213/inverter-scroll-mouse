@@ -8,16 +8,18 @@ async function main() {
   if (!password) throw new Error('GitHub authentication unavailable.');
   const [method = 'GET', endpoint = '', bodyFile] = process.argv.slice(2);
   const url = endpoint === '@user' ? 'https://api.github.com/user' : 'https://api.github.com/repos/' + repo + (endpoint ? '/' + endpoint : '');
-  const args = ['--silent','--show-error','--request',method,'--url',url,'--write-out','\n%{http_code}','--config','-'];
+  const args = ['--silent','--show-error','--location','--request',method,'--url',url,'--write-out','\n%{http_code}','--config','-'];
   if (bodyFile) args.push('--data-binary','@' + bodyFile);
   const config = `header = "Authorization: Bearer ${password}"\nheader = "Accept: application/vnd.github+json"\nheader = "Content-Type: application/json"\nuser-agent = "MouseScroll-Build"\n`;
   const result = execFileSync('curl.exe', args, { input:config,encoding:'utf8',stdio:['pipe','pipe','pipe'] });
   const split = result.lastIndexOf('\n'); const body = result.slice(0,split); const status = Number(result.slice(split + 1));
   if (status < 200 || status > 299) throw new Error(`GitHub HTTP ${status}: ${body.slice(0,700)}`);
   if (!body) { console.log(status); return; }
+  if (endpoint.endsWith('/logs')) { console.log(body.slice(-16000)); return; }
   const data = JSON.parse(body);
   if (endpoint === '@user') console.log(JSON.stringify({ login: data.login }));
   else if (data.workflow_runs) console.log(JSON.stringify(data.workflow_runs.map(r => ({ id: r.id, status: r.status, conclusion: r.conclusion, head_sha: r.head_sha, url: r.html_url }))));
+  else if (data.jobs) console.log(JSON.stringify(data.jobs.map(j => ({ id:j.id,name:j.name,status:j.status,conclusion:j.conclusion,steps:j.steps?.map(s=>({name:s.name,status:s.status,conclusion:s.conclusion})) }))));
   else if (endpoint === '') console.log(JSON.stringify({ full_name: data.full_name, default_branch: data.default_branch, private: data.private, permissions: data.permissions }));
   else if (Array.isArray(data)) console.log(JSON.stringify(data.map(r => ({ id:r.id, name:r.name, status:r.status, conclusion:r.conclusion, html_url:r.html_url, tag_name:r.tag_name }))));
   else console.log(JSON.stringify(data));
